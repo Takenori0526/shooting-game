@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>マスコットAシューティング</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; margin: auto; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+</head>
+<body>
+
+<script>
+const config = {
+  type: Phaser.AUTO,
+  width: 360,
+  height: 640,
+  backgroundColor: '#222',
+  physics: {
+    default: 'arcade',
+    arcade: {
+      debug: false
+    }
+  },
+  scene: {
+    preload,
+    create,
+    update
+  }
+};
+
+const game = new Phaser.Game(config);
+
+let player, cursors, bullets, enemies, items, bosses;
+let lastFired = 0;
+let score = 0;
+let scoreText;
+let timeLeft = 60;
+let timerText;
+let powerUp = false;
+let powerUpTimer;
+
+function preload() {
+  // 仮素材読み込み（Phaser内蔵 or 自作）
+  this.load.image('player', 'https://labs.phaser.io/assets/sprites/mushroom2.png'); // マスコットA
+  this.load.image('bullet', 'https://labs.phaser.io/assets/sprites/bullet.png');
+  this.load.image('enemy', 'https://labs.phaser.io/assets/sprites/ufo.png');
+  this.load.image('boss', 'https://labs.phaser.io/assets/sprites/space-baddie.png');
+  this.load.image('item', 'https://labs.phaser.io/assets/sprites/apple.png'); // サービスアイコン
+  this.load.image('bg', 'https://labs.phaser.io/assets/skies/space3.png');
+}
+
+function create() {
+  this.add.tileSprite(0, 0, 360, 640, 'bg').setOrigin(0, 0);
+
+  player = this.physics.add.sprite(180, 550, 'player').setCollideWorldBounds(true).setScale(1.2);
+
+  bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Image, maxSize: 20, runChildUpdate: true });
+  enemies = this.physics.add.group();
+  bosses = this.physics.add.group();
+  items = this.physics.add.group();
+
+  scoreText = this.add.text(10, 10, 'スコア: 0', { fontSize: '18px', fill: '#fff' });
+  timerText = this.add.text(10, 30, '残り: 60秒', { fontSize: '18px', fill: '#fff' });
+
+  cursors = this.input.keyboard.createCursorKeys();
+
+  this.input.on('pointermove', function (pointer) {
+    player.x = pointer.x;
+  });
+
+  this.time.addEvent({
+    delay: 1000,
+    callback: () => {
+      timeLeft--;
+      timerText.setText('残り: ' + timeLeft + '秒');
+      if (timeLeft <= 0) endGame.call(this);
+    },
+    loop: true
+  });
+
+  this.time.addEvent({
+    delay: 500,
+    callback: () => {
+      let bullet = bullets.get(player.x, player.y - 20, 'bullet');
+      if (bullet) {
+        bullet.setActive(true);
+        bullet.setVisible(true);
+        bullet.body.velocity.y = -400;
+        bullet.setScale(powerUp ? 1.5 : 1);
+      }
+    },
+    loop: true
+  });
+
+  this.time.addEvent({
+    delay: 1500,
+    callback: () => {
+      let x = Phaser.Math.Between(20, 340);
+      let enemy = enemies.create(x, -50, 'enemy');
+      enemy.setVelocityY(100);
+    },
+    loop: true
+  });
+
+  this.time.addEvent({
+    delay: 7000,
+    callback: () => {
+      let boss = bosses.create(Phaser.Math.Between(40, 320), -80, 'boss');
+      boss.setVelocityY(60);
+    },
+    loop: true
+  });
+
+  this.time.addEvent({
+    delay: 10000,
+    callback: () => {
+      let item = items.create(Phaser.Math.Between(40, 320), -50, 'item');
+      item.setVelocityY(100);
+    },
+    loop: true
+  });
+
+  this.physics.add.overlap(bullets, enemies, (bullet, enemy) => {
+    bullet.destroy();
+    enemy.destroy();
+    score += 10;
+    scoreText.setText('スコア: ' + score);
+  });
+
+  this.physics.add.overlap(bullets, bosses, (bullet, boss) => {
+    bullet.destroy();
+    boss.destroy();
+    score += 100;
+    scoreText.setText('スコア: ' + score);
+  });
+
+  this.physics.add.overlap(player, items, (player, item) => {
+    item.destroy();
+    powerUp = true;
+    if (powerUpTimer) powerUpTimer.remove();
+    powerUpTimer = this.time.addEvent({
+      delay: 5000,
+      callback: () => { powerUp = false; },
+      loop: false
+    });
+  });
+}
+
+function update() {
+  bullets.children.each(function (b) {
+    if (b.active && b.y < 0) b.setActive(false).setVisible(false);
+  }, this);
+}
+
+function endGame() {
+  this.scene.pause();
+  this.add.text(60, 280, 'ゲーム終了！\nあなたのスコア: ' + score, { fontSize: '22px', fill: '#fff' });
+  this.add.text(100, 360, 'もう一度プレイするには\nページを再読み込みしてください', { fontSize: '14px', fill: '#ccc' });
+}
+</script>
+
+</body>
+</html>
